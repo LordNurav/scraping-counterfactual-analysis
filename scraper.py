@@ -10,6 +10,7 @@ from langchain_community.embeddings import AzureOpenAIEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain_community.llms import AzureOpenAI
+import sys
 
 # Load environment variables
 load_dotenv()
@@ -23,20 +24,14 @@ GPT_DEPLOYMENT_NAME2 = os.getenv('gpt_deployment_name2')
 openai.api_base = AZURE_OPENAI_ENDPOINT
 openai.api_key = AZURE_OPENAI_API_KEY
 
-def scrape_webpage(url_or_html):
+def scrape_webpage(html_content):
     try:
-        if url_or_html.startswith("http"):
-            response = requests.get(url_or_html)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.content, 'html.parser')
-        else:
-            soup = BeautifulSoup(url_or_html, 'html.parser')
-        
+        soup = BeautifulSoup(html_content, 'html.parser')
         text = ' '.join(p.get_text() for p in soup.find_all('p'))
         if not text.strip():  # Check if text is empty after stripping
             raise ValueError("Failed to scrape content from the webpage.")
         return text
-    except (requests.RequestException, ValueError) as e:
+    except ValueError as e:
         print(f"Error: {e}")
         return "Failed to scrape content from the webpage."
 
@@ -63,17 +58,16 @@ def summarize_content(content):
     response = azure_openai(prompt)
     return response
 
-def main(url_or_html):
-    content = scrape_webpage(url_or_html)
+def main(html_content):
+    content = scrape_webpage(html_content)
     if content == "Failed to scrape content from the webpage.":
         return content
 
-    document = Document(page_content=content, metadata={"source": url_or_html})
+    document = Document(page_content=content, metadata={"source": "generated_html"})
     summary = summarize_content(content)
     return summary
 
 if __name__ == "__main__":
-    import sys
-    html_content = sys.argv[1]  # Receive HTML content as an argument
+    html_content = sys.stdin.read()  # Read HTML content from stdin
     summary = main(html_content)
     print(summary)
